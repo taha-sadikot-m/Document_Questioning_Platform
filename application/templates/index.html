@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DocIntel — Document Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+<style>
+:root {
+  --bg:        #0d0e11;
+  --bg2:       #13151a;
+  --bg3:       #1a1d24;
+  --border:    #252830;
+  --border2:   #2e323d;
+  --text:      #e8eaf0;
+  --muted:     #6b7080;
+  --accent:    #c8f060;
+  --accent2:   #7cf0c0;
+  --accent3:   #f0a050;
+  --danger:    #f05060;
+  --serif:     'DM Serif Display', serif;
+  --mono:      'DM Mono', monospace;
+  --sans:      'Syne', sans-serif;
+  --radius:    10px;
+  --radius-lg: 16px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow: hidden;
+}
+
+/* ── Layout ────────────────────────────────────────────────────── */
+#app {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  grid-template-rows: 56px 1fr;
+  height: 100vh;
+}
+
+/* ── Header ────────────────────────────────────────────────────── */
+#header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  gap: 16px;
+  position: relative;
+  z-index: 10;
+}
+
+.logo {
+  font-family: var(--serif);
+  font-size: 22px;
+  letter-spacing: -0.5px;
+  color: var(--accent);
+}
+.logo span { color: var(--text); opacity: 0.5; }
+
+.header-status {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  display: inline-block;
+  margin-right: 5px;
+}
+.status-dot.ok { background: var(--accent2); box-shadow: 0 0 6px var(--accent2); }
+.status-dot.err { background: var(--danger); }
+
+/* ── Sidebar ───────────────────────────────────────────────────── */
+#sidebar {
+  border-right: 1px solid var(--border);
+  background: var(--bg2);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-section {
+  padding: 18px 16px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.section-label {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+/* ── Upload zone ───────────────────────────────────────────────── */
+#drop-zone {
+  border: 1.5px dashed var(--border2);
+  border-radius: var(--radius);
+  padding: 22px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+  background: var(--bg3);
+  position: relative;
+}
+#drop-zone:hover, #drop-zone.drag-over {
+  border-color: var(--accent);
+  background: rgba(200,240,96,.04);
+}
+#drop-zone input[type=file] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer;
+}
+.drop-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+  filter: grayscale(0.5);
+}
+.drop-text { font-size: 12px; color: var(--muted); }
+.drop-text strong { color: var(--accent); font-weight: 600; }
+.drop-exts {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 5px;
+  opacity: 0.7;
+}
+
+/* ── Upload progress ───────────────────────────────────────────── */
+#upload-progress {
+  display: none;
+  padding: 12px 16px;
+  background: rgba(200,240,96,.04);
+  border-bottom: 1px solid var(--border);
+}
+.progress-bar-wrap {
+  height: 3px;
+  background: var(--border2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  width: 0%;
+  transition: width .4s ease;
+  animation: progress-pulse 1.4s ease-in-out infinite;
+}
+@keyframes progress-pulse {
+  0%,100% { opacity: 1; }
+  50% { opacity: .6; }
+}
+.progress-stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.progress-spinner {
+  width: 10px; height: 10px;
+  border: 1.5px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.progress-text {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+.progress-file-count {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent);
+  opacity: 0.8;
+}
+
+/* ── Document list ─────────────────────────────────────────────── */
+#doc-list-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 8px;
+}
+#doc-list-wrap::-webkit-scrollbar { width: 4px; }
+#doc-list-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+.doc-empty {
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 32px 16px;
+  font-family: var(--mono);
+  opacity: 0.6;
+}
+
+.doc-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: background .15s;
+  border: 1px solid transparent;
+}
+.doc-item:hover { background: var(--bg3); }
+.doc-item.selected {
+  background: rgba(200,240,96,.06);
+  border-color: rgba(200,240,96,.2);
+}
+
+.doc-checkbox {
+  width: 16px; height: 16px;
+  border: 1.5px solid var(--border2);
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+  background: var(--bg);
+}
+.doc-item.selected .doc-checkbox {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.doc-checkbox svg { display: none; }
+.doc-item.selected .doc-checkbox svg { display: block; }
+
+.doc-info { flex: 1; min-width: 0; }
+.doc-name {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+.doc-meta {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.doc-delete {
+  background: none; border: none; cursor: pointer;
+  color: var(--muted); padding: 2px 4px;
+  opacity: 0; transition: opacity .15s;
+  font-size: 14px;
+  line-height: 1;
+}
+.doc-item:hover .doc-delete { opacity: 0.6; }
+.doc-delete:hover { color: var(--danger) !important; opacity: 1 !important; }
+
+/* ── Scope bar ─────────────────────────────────────────────────── */
+.scope-bar {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--bg2);
+}
+.scope-pill {
+  background: rgba(200,240,96,.1);
+  color: var(--accent);
+  border-radius: 99px;
+  padding: 2px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+/* ── Main chat area ────────────────────────────────────────────── */
+#main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* ── Chat messages ─────────────────────────────────────────────── */
+#messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+#messages::-webkit-scrollbar { width: 5px; }
+#messages::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* Welcome screen */
+.welcome {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px;
+  animation: fade-in .5s ease;
+}
+.welcome-title {
+  font-family: var(--serif);
+  font-size: 42px;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  margin-bottom: 12px;
+  color: var(--text);
+}
+.welcome-title em { color: var(--accent); font-style: italic; }
+.welcome-sub {
+  color: var(--muted);
+  font-size: 14px;
+  max-width: 400px;
+  line-height: 1.7;
+  margin-bottom: 28px;
+}
+.welcome-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  max-width: 480px;
+}
+.chip {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: 99px;
+  padding: 6px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all .15s;
+  color: var(--muted);
+}
+.chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(200,240,96,.04);
+}
+
+/* Message bubbles */
+.msg {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: slide-up .3s ease;
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; } to { opacity: 1; }
+}
+
+.msg-user {
+  align-self: flex-end;
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-lg) var(--radius-lg) 4px var(--radius-lg);
+  padding: 12px 16px;
+  max-width: 70%;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.msg-ai {
+  align-self: flex-start;
+  max-width: 85%;
+}
+.msg-ai-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ai-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent);
+  letter-spacing: 0.1em;
+  background: rgba(200,240,96,.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.msg-ai-body {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 4px var(--radius-lg) var(--radius-lg) var(--radius-lg);
+  padding: 16px 20px;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+/* Markdown rendered content */
+.msg-ai-body h1, .msg-ai-body h2, .msg-ai-body h3 {
+  font-family: var(--serif);
+  color: var(--text);
+  margin: 16px 0 8px;
+}
+.msg-ai-body h1 { font-size: 22px; }
+.msg-ai-body h2 { font-size: 18px; }
+.msg-ai-body h3 { font-size: 15px; }
+.msg-ai-body p { margin-bottom: 10px; }
+.msg-ai-body code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--bg3);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--accent2);
+}
+.msg-ai-body pre {
+  background: #0a0b0e;
+  border-radius: var(--radius);
+  overflow-x: auto;
+  margin: 10px 0;
+  border: 1px solid var(--border);
+}
+.msg-ai-body pre code { background: none; padding: 0; }
+.msg-ai-body ul, .msg-ai-body ol { padding-left: 20px; margin-bottom: 10px; }
+.msg-ai-body li { margin-bottom: 4px; }
+.msg-ai-body strong { color: var(--text); font-weight: 600; }
+
+/* Citation refs inline */
+.cite-ref {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px; height: 18px;
+  background: var(--accent);
+  color: var(--bg);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 4px;
+  vertical-align: super;
+  cursor: pointer;
+  transition: transform .1s;
+  line-height: 1;
+}
+.cite-ref:hover { transform: scale(1.15); }
+
+/* Confidence tier tags */
+.confidence-tag {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.confidence-high    { background: rgba(124,240,192,.15); color: var(--accent2); border: 1px solid rgba(124,240,192,.3); }
+.confidence-partial { background: rgba(240,160,80,.12);  color: var(--accent3); border: 1px solid rgba(240,160,80,.3); }
+.confidence-none    { background: rgba(240,80,96,.1);    color: var(--danger);  border: 1px solid rgba(240,80,96,.25); }
+
+/* Citations panel */
+.citations-panel {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.citations-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 4px 0;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: color .15s;
+}
+.citations-toggle:hover { color: var(--text); }
+.citations-toggle svg { transition: transform .2s; }
+.citations-toggle.open svg { transform: rotate(180deg); }
+.citations-body {
+  display: none;
+  margin-top: 8px;
+}
+.citations-body.open { display: block; }
+.citation-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg3);
+  border-radius: var(--radius);
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  transition: border-color .15s;
+}
+.citation-item:hover { border-color: var(--border2); }
+.cit-num {
+  width: 20px; height: 20px;
+  background: rgba(200,240,96,.15);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.cit-info { flex: 1; min-width: 0; }
+.cit-file {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cit-loc {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.cit-score {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent2);
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* Sources toggle */
+.sources-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+  margin-top: 8px;
+  padding: 4px 0;
+  transition: color .15s;
+}
+.sources-toggle:hover { color: var(--text); }
+.sources-toggle svg { transition: transform .2s; }
+.sources-toggle.open svg { transform: rotate(180deg); }
+
+/* Chunks drawer */
+.chunks-drawer {
+  display: none;
+  margin-top: 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.chunks-drawer.open { display: block; }
+.chunk-row {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.chunk-row:last-child { border-bottom: none; }
+.chunk-header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 4px;
+}
+.chunk-ref {
+  font-family: var(--mono);
+  font-size: 10px;
+  background: rgba(124,240,192,.1);
+  color: var(--accent2);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+.chunk-file {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+}
+.chunk-score {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--accent3);
+}
+.chunk-preview {
+  color: var(--muted);
+  line-height: 1.6;
+  font-size: 12px;
+}
+
+/* Thinking indicator */
+.thinking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 4px var(--radius-lg) var(--radius-lg) var(--radius-lg);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--muted);
+}
+.dots {
+  display: flex; gap: 4px;
+}
+.dots span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: dot-bounce .9s ease-in-out infinite;
+}
+.dots span:nth-child(2) { animation-delay: .15s; }
+.dots span:nth-child(3) { animation-delay: .3s; }
+@keyframes dot-bounce {
+  0%,60%,100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+
+/* Error message */
+.msg-error {
+  background: rgba(240,80,96,.08);
+  border: 1px solid rgba(240,80,96,.25);
+  color: #f08090;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  font-family: var(--mono);
+}
+
+/* ── Input bar ─────────────────────────────────────────────────── */
+#input-area {
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+}
+
+.input-wrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  background: var(--bg3);
+  border: 1.5px solid var(--border2);
+  border-radius: var(--radius-lg);
+  padding: 10px 10px 10px 16px;
+  transition: border-color .2s;
+}
+.input-wrap:focus-within {
+  border-color: rgba(200,240,96,.4);
+  box-shadow: 0 0 0 3px rgba(200,240,96,.06);
+}
+
+#query-input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  resize: none;
+  outline: none;
+  max-height: 140px;
+  min-height: 22px;
+}
+#query-input::placeholder { color: var(--muted); }
+
+#send-btn {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border: none; border-radius: 9px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  transition: all .15s;
+}
+#send-btn:hover { background: #d4f570; transform: scale(1.04); }
+#send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+#send-btn svg { color: var(--bg); }
+
+.input-hint {
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 7px;
+  text-align: right;
+  opacity: 0.6;
+}
+
+/* ── Toast ─────────────────────────────────────────────────────── */
+#toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
+}
+.toast {
+  background: var(--bg3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 13px;
+  font-family: var(--mono);
+  color: var(--text);
+  animation: toast-in .3s ease;
+  max-width: 320px;
+}
+.toast.success { border-color: rgba(124,240,192,.3); color: var(--accent2); }
+.toast.error   { border-color: rgba(240,80,96,.3);   color: var(--danger); }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Scrollbar global ──────────────────────────────────────────── */
+* { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- HEADER -->
+  <header id="header">
+    <div class="logo">DocIntel<span>.</span></div>
+    <div style="height:20px; width:1px; background:var(--border);"></div>
+    <span style="font-family:var(--mono);font-size:11px;color:var(--muted);">document intelligence system</span>
+    <div class="header-status">
+      <span><span class="status-dot" id="status-dot"></span><span id="status-text">connecting...</span></span>
+      <span id="status-chunks" style="display:none;">— <span id="chunk-count">0</span> chunks indexed</span>
+    </div>
+  </header>
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+
+    <div class="sidebar-section">
+      <div class="section-label">Upload documents</div>
+      <div id="drop-zone">
+        <input type="file" id="file-input" multiple accept=".pdf,.docx,.txt,.md,.html,.xml,.jpg,.png,.jpeg,.csv,.json,.pptx,.xlsx">
+        <div class="drop-icon">📄</div>
+        <div class="drop-text"><strong>Drop files</strong> or click to browse</div>
+        <div class="drop-exts">PDF · DOCX · TXT · MD · HTML · XML · JPG · PNG · JPEG · CSV · JSON · PPTX · XLSX</div>
+      </div>
+    </div>
+
+    <div id="upload-progress">
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="progress-bar"></div>
+      </div>
+      <div class="progress-stage">
+        <div class="progress-spinner" id="progress-spinner"></div>
+        <span class="progress-text" id="progress-text">Uploading…</span>
+        <span class="progress-file-count" id="progress-file-count"></span>
+      </div>
+    </div>
+
+    <div class="sidebar-section" style="padding-bottom:8px;">
+      <div class="section-label">
+        Documents
+        <span id="doc-count" style="float:right;color:var(--accent);font-size:10px;"></span>
+      </div>
+    </div>
+
+    <div id="doc-list-wrap">
+      <div class="doc-empty" id="doc-empty">No documents yet.<br>Upload to get started.</div>
+      <div id="doc-list"></div>
+    </div>
+
+    <div class="scope-bar" id="scope-bar">
+      <span>Scope:</span>
+      <span class="scope-pill" id="scope-pill">all documents</span>
+    </div>
+
+  </aside>
+
+  <!-- MAIN -->
+  <main id="main">
+    <div id="messages">
+      <div class="welcome" id="welcome">
+        <div class="welcome-title">Ask your <em>documents</em><br>anything.</div>
+        <div class="welcome-sub">Upload PDFs, DOCX, or text files. Then ask natural language questions — every answer comes with source citations.</div>
+        <div class="welcome-chips" id="example-chips">
+          <div class="chip" onclick="setQuery('Summarize the key points of this document')">Summarize key points</div>
+          <div class="chip" onclick="setQuery('What are the main requirements listed?')">Main requirements</div>
+          <div class="chip" onclick="setQuery('What technical decisions are mentioned?')">Technical decisions</div>
+          <div class="chip" onclick="setQuery('What are the deliverables?')">Deliverables</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="input-area">
+      <div class="input-wrap">
+        <textarea id="query-input" placeholder="Ask a question about your documents…" rows="1"></textarea>
+        <button id="send-btn" onclick="sendQuery()" title="Send (Enter)">
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <path d="M5 12h14M12 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+      <div class="input-hint">Enter to send · Shift+Enter for newline</div>
+    </div>
+  </main>
+
+</div>
+
+<div id="toast-container"></div>
+
+<!-- Markdown parser -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+const state = {
+  docs: {},        // doc_id → { filename, chunk_count, uploaded_at }
+  selected: new Set(), // selected doc_ids for scoped queries
+};
+
+// ── Startup ────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await checkHealth();
+  await loadDocuments();
+  setInterval(checkHealth, 30000);
+  autoResize(document.getElementById('query-input'));
+});
+
+// ── Health check ──────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch('/health');
+    const d = await r.json();
+    const dot = document.getElementById('status-dot');
+    const txt = document.getElementById('status-text');
+    const cc  = document.getElementById('status-chunks');
+    const ccn = document.getElementById('chunk-count');
+    if (d.status === 'ok') {
+      dot.className = 'status-dot ok';
+      txt.textContent = d.gemini_ready ? 'ready' : 'no LLM key';
+      cc.style.display = '';
+      ccn.textContent = d.total_chunks;
+    } else {
+      dot.className = 'status-dot err';
+      txt.textContent = 'error';
+    }
+  } catch {
+    document.getElementById('status-dot').className = 'status-dot err';
+    document.getElementById('status-text').textContent = 'offline';
+  }
+}
+
+// ── Load documents from server ────────────────────────────────────────────
+async function loadDocuments() {
+  try {
+    const r = await fetch('/documents');
+    const d = await r.json();
+    state.docs = {};
+    d.documents.forEach(doc => { state.docs[doc.doc_id] = doc; });
+    renderDocList();
+  } catch { }
+}
+
+// ── Render document sidebar ───────────────────────────────────────────────
+function renderDocList() {
+  const list  = document.getElementById('doc-list');
+  const empty = document.getElementById('doc-empty');
+  const count = document.getElementById('doc-count');
+  const docs  = Object.values(state.docs);
+
+  count.textContent = docs.length ? `${docs.length} doc${docs.length > 1 ? 's' : ''}` : '';
+
+  if (!docs.length) {
+    empty.style.display = '';
+    list.innerHTML = '';
+    return;
+  }
+  empty.style.display = 'none';
+
+  list.innerHTML = docs.map(doc => {
+    const sel = state.selected.has(doc.doc_id);
+    const ext = doc.filename.split('.').pop().toUpperCase();
+    const time = new Date(doc.uploaded_at).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
+    return `
+    <div class="doc-item ${sel ? 'selected' : ''}" onclick="toggleDoc('${doc.doc_id}')" data-id="${doc.doc_id}">
+      <div class="doc-checkbox">
+        <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+          <path d="M2 6l3 3 5-5" stroke="#0d0e11" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="doc-info">
+        <div class="doc-name" title="${doc.filename}">${doc.filename}</div>
+        <div class="doc-meta">${ext} · ${doc.chunk_count} chunks · ${time}</div>
+      </div>
+      <button class="doc-delete" onclick="deleteDoc(event, '${doc.doc_id}')" title="Remove">×</button>
+    </div>`;
+  }).join('');
+
+  updateScopeBar();
+}
+
+// ── Toggle doc selection ──────────────────────────────────────────────────
+function toggleDoc(docId) {
+  if (state.selected.has(docId)) {
+    state.selected.delete(docId);
+  } else {
+    state.selected.add(docId);
+  }
+  renderDocList();
+}
+
+function updateScopeBar() {
+  const pill = document.getElementById('scope-pill');
+  const n = state.selected.size;
+  if (n === 0) {
+    pill.textContent = 'all documents';
+  } else if (n === 1) {
+    const id = [...state.selected][0];
+    pill.textContent = state.docs[id]?.filename || '1 doc';
+  } else {
+    pill.textContent = `${n} documents`;
+  }
+}
+
+// ── Delete document ───────────────────────────────────────────────────────
+async function deleteDoc(evt, docId) {
+  evt.stopPropagation();
+  try {
+    await fetch(`/documents/${docId}`, { method: 'DELETE' });
+    delete state.docs[docId];
+    state.selected.delete(docId);
+    renderDocList();
+    checkHealth();
+    toast('Document removed', 'success');
+  } catch {
+    toast('Failed to remove document', 'error');
+  }
+}
+
+// ── File upload ───────────────────────────────────────────────────────────
+const dropZone  = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  uploadFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', () => uploadFiles(fileInput.files));
+
+async function uploadFiles(files) {
+  if (!files.length) return;
+
+  const prog      = document.getElementById('upload-progress');
+  const bar       = document.getElementById('progress-bar');
+  const progText  = document.getElementById('progress-text');
+  const fileCount = document.getElementById('progress-file-count');
+
+  const fileWord = files.length > 1 ? `${files.length} files` : `"${files[0].name}"`;
+
+  // Stage messages that cycle while the server is processing
+  const stages = [
+    'Uploading to server…',
+    'Converting document…',
+    'Extracting text & structure…',
+    'Chunking content…',
+    'Generating embeddings…',
+    'Saving to vector store…',
+  ];
+  let stageIdx = 0;
+  let stageTimer = null;
+
+  function startStages(fromIdx) {
+    stageIdx = fromIdx;
+    progText.textContent = stages[stageIdx];
+    stageTimer = setInterval(() => {
+      stageIdx = (stageIdx + 1) % stages.length;
+      progText.textContent = stages[stageIdx];
+    }, 2200);
+  }
+
+  function stopStages() {
+    if (stageTimer) { clearInterval(stageTimer); stageTimer = null; }
+  }
+
+  // Show panel
+  prog.style.display = '';
+  bar.style.width = '15%';
+  fileCount.textContent = fileWord;
+  startStages(0);
+
+  // Disable drop zone so user can't queue another upload mid-flight
+  dropZone.style.pointerEvents = 'none';
+  dropZone.style.opacity = '0.5';
+
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f);
+
+  try {
+    bar.style.width = '35%';
+    const r = await fetch('/upload', { method: 'POST', body: fd });
+    bar.style.width = '80%';
+    startStages(4);  // jump to later stages while server finalises
+    const d = await r.json();
+    stopStages();
+
+    d.ingested?.forEach(doc => { state.docs[doc.doc_id] = doc; });
+    renderDocList();
+
+    const ok  = d.ingested?.length || 0;
+    const err = d.errors?.length || 0;
+
+    if (ok) {
+      progText.textContent = `✓ ${ok} document${ok > 1 ? 's' : ''} ready`;
+      document.getElementById('progress-spinner').style.borderTopColor = 'var(--accent2)';
+      toast(`✓ ${ok} document${ok > 1 ? 's' : ''} ingested`, 'success');
+    }
+    if (err) d.errors.forEach(e => toast(`✗ ${e.filename}: ${e.error}`, 'error'));
+    if (!ok && err) progText.textContent = 'Ingestion failed — see error above';
+
+    checkHealth();
+    bar.style.width = '100%';
+    setTimeout(() => {
+      prog.style.display = 'none';
+      bar.style.width = '0%';
+      document.getElementById('progress-spinner').style.borderTopColor = '';
+    }, 1800);
+  } catch (e) {
+    stopStages();
+    progText.textContent = 'Upload failed';
+    toast('Upload failed: ' + e.message, 'error');
+    setTimeout(() => { prog.style.display = 'none'; }, 2000);
+  }
+
+  dropZone.style.pointerEvents = '';
+  dropZone.style.opacity = '';
+  fileInput.value = '';
+}
+
+// ── Query input ───────────────────────────────────────────────────────────
+const queryInput = document.getElementById('query-input');
+const sendBtn    = document.getElementById('send-btn');
+
+queryInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendQuery(); }
+});
+
+function autoResize(el) {
+  el.addEventListener('input', () => {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 140) + 'px';
+  });
+}
+
+function setQuery(text) {
+  queryInput.value = text;
+  queryInput.focus();
+  queryInput.dispatchEvent(new Event('input'));
+}
+
+let isQuerying = false;
+
+async function sendQuery() {
+  const q = queryInput.value.trim();
+  if (!q || isQuerying) return;
+
+  isQuerying = true;
+  sendBtn.disabled = true;
+
+  // Hide welcome
+  document.getElementById('welcome')?.remove();
+
+  const messages = document.getElementById('messages');
+
+  // Add user message
+  const userMsg = document.createElement('div');
+  userMsg.className = 'msg';
+  userMsg.innerHTML = `<div class="msg-user">${escapeHtml(q)}</div>`;
+  messages.appendChild(userMsg);
+
+  // Thinking indicator
+  const thinking = document.createElement('div');
+  thinking.className = 'msg';
+  thinking.innerHTML = `
+    <div class="thinking">
+      <div class="dots"><span></span><span></span><span></span></div>
+      Retrieving and reasoning...
+    </div>`;
+  messages.appendChild(thinking);
+  messages.scrollTop = messages.scrollHeight;
+
+  queryInput.value = '';
+  queryInput.style.height = 'auto';
+
+  try {
+    const body = { query: q };
+    if (state.selected.size > 0) {
+      body.doc_ids = [...state.selected];
+    }
+
+    const r = await fetch('/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const d = await r.json();
+
+    thinking.remove();
+
+    if (d.error) {
+      const errDiv = document.createElement('div');
+      errDiv.className = 'msg';
+      errDiv.innerHTML = `<div class="msg-error">Error: ${escapeHtml(d.error)}</div>`;
+      messages.appendChild(errDiv);
+    } else {
+      renderAnswer(messages, d);
+    }
+  } catch (e) {
+    thinking.remove();
+    const errDiv = document.createElement('div');
+    errDiv.className = 'msg';
+    errDiv.innerHTML = `<div class="msg-error">Network error: ${escapeHtml(e.message)}</div>`;
+    messages.appendChild(errDiv);
+  }
+
+  messages.scrollTop = messages.scrollHeight;
+  isQuerying = false;
+  sendBtn.disabled = false;
+  queryInput.focus();
+}
+
+// ── Render answer ─────────────────────────────────────────────────────────
+function renderAnswer(container, data) {
+  const aiDiv = document.createElement('div');
+  aiDiv.className = 'msg msg-ai';
+
+  // Use placeholders so marked.parse() never sees brackets or HTML.
+  // marked treats [1][2] as reference-style links and strips inline HTML spans,
+  // so we swap to opaque tokens, let marked run, then replace tokens with HTML.
+  let rawAnswer = data.answer || '';
+
+  // Step 1 — pull out confidence tier tag and replace with placeholder
+  rawAnswer = rawAnswer.replace(/^\s*\[(HIGH|PARTIAL|NONE)\]\s*/i, (_, tier) =>
+    `XCONFX_${tier.toUpperCase()}_XCONFX `
+  );
+
+  // Step 2 — replace every [n] with a placeholder
+  rawAnswer = rawAnswer.replace(/\[(\d+)\]/g, (_, n) => `XCITEX_${n}_XCITEX`);
+
+  // Step 3 — run markdown parser (sees only safe plain text)
+  let answerHtml = marked.parse(rawAnswer);
+
+  // Step 4 — swap placeholders back to styled HTML
+  answerHtml = answerHtml.replace(/XCONFX_(HIGH|PARTIAL|NONE)_XCONFX/g, (_, tier) =>
+    `<span class="confidence-tag confidence-${tier.toLowerCase()}">${tier}</span>`
+  );
+  answerHtml = answerHtml.replace(/XCITEX_(\d+)_XCITEX/g, (_, n) =>
+    `<span class="cite-ref" title="Source ${n}">${n}</span>`
+  );
+
+  // Citations (collapsible)
+  let citHtml = '';
+  const citId = 'cit_' + Date.now();
+  if (data.citations?.length) {
+    const rows = data.citations.map(c => {
+      const loc = [c.page !== 'unknown' ? `p.${c.page}` : '', c.section].filter(Boolean).join(' · ');
+      return `
+      <div class="citation-item">
+        <div class="cit-num">${c.ref}</div>
+        <div class="cit-info">
+          <div class="cit-file">${escapeHtml(c.filename)}</div>
+          ${loc ? `<div class="cit-loc">${escapeHtml(loc)}</div>` : ''}
+        </div>
+        <div class="cit-score">${(c.score * 100).toFixed(0)}%</div>
+      </div>`;
+    }).join('');
+
+    citHtml = `
+    <div class="citations-panel">
+      <button class="citations-toggle" onclick="toggleCitations('${citId}', this)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Sources cited (${data.citations.length})
+      </button>
+      <div class="citations-body" id="${citId}">${rows}</div>
+    </div>`;
+  }
+
+  // Chunks drawer (retrieved context)
+  let chunksHtml = '';
+  const msgId = 'msg_' + Date.now();
+  if (data.chunks_used?.length) {
+    const rows = data.chunks_used.map(c => {
+      const loc = c.page && c.page !== 'unknown' ? `p.${c.page}` : '';
+      return `
+      <div class="chunk-row">
+        <div class="chunk-header">
+          <span class="chunk-ref">[${c.ref}]</span>
+          <span class="chunk-file">${escapeHtml(c.filename)}${loc ? ' · ' + loc : ''}</span>
+          <span class="chunk-score">${(c.score * 100).toFixed(0)}%</span>
+        </div>
+        <div class="chunk-preview">${escapeHtml(c.preview)}</div>
+      </div>`;
+    }).join('');
+    chunksHtml = `
+    <button class="sources-toggle" onclick="toggleChunks('${msgId}', this)">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M6 9l6 6 6-6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      ${data.chunks_used.length} retrieved chunks
+    </button>
+    <div class="chunks-drawer" id="${msgId}">${rows}</div>`;
+  }
+
+  aiDiv.innerHTML = `
+    <div class="msg-ai-header">
+      <span class="ai-badge">DOCINTEL</span>
+    </div>
+    <div class="msg-ai-body">
+      ${answerHtml}
+      ${citHtml}
+    </div>
+    ${chunksHtml}`;
+
+  container.appendChild(aiDiv);
+}
+
+function toggleChunks(id, btn) {
+  const drawer = document.getElementById(id);
+  drawer.classList.toggle('open');
+  btn.classList.toggle('open');
+}
+
+function toggleCitations(id, btn) {
+  const body = document.getElementById(id);
+  body.classList.toggle('open');
+  btn.classList.toggle('open');
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function toast(msg, type = '') {
+  const tc = document.getElementById('toast-container');
+  const t  = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.textContent = msg;
+  tc.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+</script>
+</body>
+</html>

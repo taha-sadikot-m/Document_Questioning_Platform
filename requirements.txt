@@ -1,0 +1,29 @@
+# Orchestration & LLM
+langgraph
+langchain-openai
+openai
+pydantic
+
+# Document Processing & Parsing
+docling
+python-docx
+python-magic
+
+# Vector Storage
+chromadb
+langchain-chroma
+tiktoken
+
+# API & Server
+flask
+uvicorn
+python-multipart
+python-dotenv
+
+# Utilities
+tqdm
+docling
+
+flask_cors
+google-genai
+sentence_transformers
