@@ -11,6 +11,7 @@ from google import genai
 from docling.document_converter import DocumentConverter
 from docling.chunking import HybridChunker
 from transformers import AutoTokenizer
+from sentence_transformers import CrossEncoder
 
 from datetime import datetime
 import re
@@ -66,6 +67,7 @@ log.info("ChromaDB collection 'documents' is ready for use.")
 document_converter = DocumentConverter()
 tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-MiniLM-L6-v2")
 chunker = HybridChunker(tokenizer=tokenizer, max_tokens=MAX_TOKENS, merge_peers=True)
+reranker = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2", max_length=512)
 log.info("Application setup complete. Ready to process documents and handle queries.")
 
 #Global Data Storing
@@ -219,12 +221,14 @@ def get_data_from_vector(query:str, doc_id:list[str] | None = None)-> list[dict]
             "score":        round(similarity, 4),
         })
 
-    query_terms = set(query.lower().split())
-    for chunk in chunks:
-        text_lower = chunk["text"].lower()
-        term_hits  = sum(1 for t in query_terms if t in text_lower)
-        # Small additive boost: doesn't override semantic score, just nudges
-        chunk["score"] = round(chunk["score"] + 0.02 * term_hits, 4)
+    # Cross-encoder reranking: jointly scores (query, chunk) pairs — same
+    # mechanism as Cohere Rerank but runs locally with no API cost.
+    # Scores are raw logits (unbounded) — only their relative order matters.
+    if chunks:
+        pairs = [(query, chunk["text"]) for chunk in chunks]
+        ce_scores = reranker.predict(pairs)
+        for chunk, score in zip(chunks, ce_scores):
+            chunk["score"] = round(float(score), 4)
 
     chunks.sort(key=lambda x: x["score"], reverse=True)
     return chunks[:TOP_N]
@@ -445,6 +449,6 @@ def health():
     })
 
 
-
+ 
 if __name__ == "__main__":
     app.run(debug=True, port=8080, host="0.0.0.0")
